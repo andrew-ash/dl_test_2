@@ -51,62 +51,6 @@ SAVE_MODEL = True
 #------------------------------------------------------------------------------------------------------------------
 #---- Define the model ---- #
 
-# This is a sample Python script.
-import random
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import MultiLabelBinarizer
-import cv2
-import pandas as pd
-from sklearn.metrics import accuracy_score, f1_score, hamming_loss, cohen_kappa_score, matthews_corrcoef, confusion_matrix, classification_report, multilabel_confusion_matrix
-import torch
-import torch.nn as nn
-import numpy as np
-from torch.utils import data
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torchvision import transforms
-from torchvision import models
-from tqdm import tqdm
-import os
-
-
-'''
-LAST UPDATED 11/10/2021, lsdr
-'''
-
-## Process images in parallel
-
-## folder "Data" images
-## folder "excel" excel file , whatever is there is the file
-## get the classes from the excel file
-## folder "Documents" readme file
-
-OR_PATH = os.getcwd()
-os.chdir("..") # Change to the parent directory
-PATH = os.getcwd()
-DATA_DIR = os.getcwd() + os.path.sep + 'Data' + os.path.sep
-sep = os.path.sep
-
-
-os.chdir(OR_PATH) # Come back to the directory where the code resides , all files will be left on this directory
-
-n_epoch = 3
-BATCH_SIZE = 30
-LR = 0.001
-
-## Image processing
-CHANNELS = 3
-IMAGE_SIZE = 100
-
-NICKNAME = "Metis"
-
-mlb = MultiLabelBinarizer()
-device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-THRESHOLD = 0.5
-SAVE_MODEL = True
-
-
-#---- Define the model ---- #
-
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
