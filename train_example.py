@@ -36,7 +36,7 @@ sep = os.path.sep
 
 os.chdir(OR_PATH) # Come back to the directory where the code resides , all files will be left on this directory
 
-n_epoch = 3
+n_epoch = 6
 BATCH_SIZE = 30
 LR = 0.001
 
@@ -51,6 +51,9 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 THRESHOLD = 0.5
 SAVE_MODEL = True
 
+# CUSTOMIZATION VARIABLES FROM EXPERIMENTATION THROUGHOUT THE PROJECT
+SHUFFLE_SEED = 1998 # Select a set seed for repeatable training as needed
+CUSTOM_LOSS_WEIGHT = 'log' # Custom loss weights could be 1/examples <- recip, 1/ln(examples) <- log, 1/log10(examples) <- log10, etc. or None
 
 #---- Define the model ---- #
 
@@ -58,25 +61,40 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 16, (3, 3))
+        self.linear_input = 256
+
+        # I have decided to put the padding in before processing the first layer to maintain size during initial processing rather than add zeroes after.
+        self.conv1 = nn.Conv2d(3, 16, (3, 3), padding=2)
         self.convnorm1 = nn.BatchNorm2d(16)
-        self.pad1 = nn.ZeroPad2d(2)
 
         self.conv2 = nn.Conv2d(16, 128, (3, 3))
+        self.convnorm2 = nn.BatchNorm2d(128)
         self.dropout1 = nn.Dropout(0.33)
 
-        self.conv3 = nn.Conv2d(128, 256, (3, 3))
+        self.conv3 = nn.Conv2d(128, self.linear_input, (3, 3))
+        self.convnorm3 = nn.BatchNorm2d(self.linear_input)
 
         self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.linear = nn.Linear(256, OUTPUTS_a)
+        self.linear = nn.Linear(self.linear_input, OUTPUTS_a)
         self.act = torch.relu
 
     def forward(self, x):
-        x = self.pad1(self.convnorm1(self.act(self.conv1(x))))
-        x = self.act(self.dropout1(self.conv2(self.act(x))))
-        x = self.act(self.conv3(x))
-        return self.linear(self.global_avg_pool(x).view(-1, 256))
+        x = self.conv1(x)
+        x = self.convnorm1(x) # Based on Medium article, batch norm before ReLU may sligthly improve performance.
+        x = self.act(x)
+
+        x = self.conv2(x)
+        x = self.convnorm2(x)
+        x = self.act(x)
+        x = self.dropout1(x)
+
+        x = self.conv3(x)
+        x = self.convnorm3(x)
+        x = self.act(x)
+
+        x = self.global_avg_pool(x).view(-1, self.linear_input)
+        return self.linear(x)
 
 class Dataset(data.Dataset):
     '''
@@ -178,8 +196,14 @@ def read_data(target_type):
 
     # Data Loaders
 
+    # Add a fixed seed to the random generator, this will allow training to be reproducible,
+    # rather than the order of training images being completely uncontrollable.
+    gen = torch.Generator()
+    gen.manual_seed(SHUFFLE_SEED)
+
     params = {'batch_size': BATCH_SIZE,
-              'shuffle': True}
+              'shuffle': True,
+              'generator': gen}
 
     training_set = Dataset(partition['train'], 'train', target_type)
     training_generator = data.DataLoader(training_set, **params)
@@ -199,7 +223,7 @@ def save_model(model):
 
     print(model, file=open('summary_{}.txt'.format(NICKNAME), "w"))
 
-def model_definition(pretrained=False):
+def model_definition(pretrained=False, loss_weights = None):
     # Define a Keras sequential model
     # Compile the model
 
@@ -212,7 +236,12 @@ def model_definition(pretrained=False):
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    criterion = nn.BCEWithLogitsLoss()
+
+    # If we have defined a custom set of loss weights, use those, otherwise, the normal loss function should be used
+    if loss_weights is not None:
+        criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(loss_weights).float().to(device))
+    else:
+        criterion = nn.BCEWithLogitsLoss()
 
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=0)
 
@@ -220,10 +249,11 @@ def model_definition(pretrained=False):
 
     return model, optimizer, criterion, scheduler
 
-def train_and_test(train_ds, test_ds, list_of_metrics, list_of_agg, save_on, pretrained = False):
+# I have added an optional variable for custom loss weights.
+def train_and_test(train_ds, test_ds, list_of_metrics, list_of_agg, save_on, pretrained = False, loss_weights = None):
     # Use a breakpoint in the code line below to debug your script.
 
-    model, optimizer, criterion, scheduler = model_definition(pretrained)
+    model, optimizer, criterion, scheduler = model_definition(pretrained, loss_weights)
 
     cont = 0
     train_loss_item = list([])
@@ -511,11 +541,14 @@ def print_class_counts(df, label_col='target', name=''):
 
     # Count occurrences of each label
     counts = Counter(all_labels)
+    count_array = []
 
     print(f"\n############ PER-CLASS COUNT ({name}) ############")
     for label, count in sorted(counts.items(), key=lambda x: int(x[0].replace("class", ""))):
         print(f"{label}: {count}")
+        count_array.append(count)
     print("############ END ############")
+    return np.array(count_array)
 
 if __name__ == '__main__':
 
@@ -538,7 +571,7 @@ if __name__ == '__main__':
 
     xdf_dset = xdf_data[xdf_data["split"] == 'train'].copy()
 
-    print_class_counts(xdf_dset, name="TRAIN+VAL")
+    pos_class_count = print_class_counts(xdf_dset, name="TRAIN+VAL")
 
     xdf_dset_test= xdf_data[xdf_data["split"] == 'test'].copy()
 
@@ -553,7 +586,23 @@ if __name__ == '__main__':
     list_of_metrics = ['f1_macro']
     list_of_agg = ['avg']
 
-    train_and_test(train_ds, test_ds, list_of_metrics, list_of_agg, save_on='f1_macro', pretrained=False)
+    if CUSTOM_LOSS_WEIGHT:
+        # Extract ground truth from train set
+        print(pos_class_count)
+        EPS = 1+1e-7
+
+        if CUSTOM_LOSS_WEIGHT == 'log10':
+            lw = 1.0 / np.log10(pos_class_count+EPS)
+        elif CUSTOM_LOSS_WEIGHT == 'log':
+            lw = 1.0 / np.log(pos_class_count+EPS)
+        elif CUSTOM_LOSS_WEIGHT == 'recip':
+            lw = 1.0 / (pos_class_count+EPS)
+        else:
+            lw = None
+    else:
+        lw = None
+
+    train_and_test(train_ds, test_ds, list_of_metrics, list_of_agg, save_on='f1_macro', pretrained=False, loss_weights=lw)
 
     # Extract ground truth and predictions from test set
     y_true_str = xdf_dset_test['target_class'].tolist()

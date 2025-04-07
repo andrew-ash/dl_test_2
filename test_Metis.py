@@ -55,25 +55,40 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 16, (3, 3))
+        self.linear_input = 256
+
+        # I have decided to put the padding in before processing the first layer to maintain size during initial processing rather than add zeroes after.
+        self.conv1 = nn.Conv2d(3, 16, (3, 3), padding=2)
         self.convnorm1 = nn.BatchNorm2d(16)
-        self.pad1 = nn.ZeroPad2d(2)
 
         self.conv2 = nn.Conv2d(16, 128, (3, 3))
+        self.convnorm2 = nn.BatchNorm2d(128)
         self.dropout1 = nn.Dropout(0.33)
 
-        self.conv3 = nn.Conv2d(128, 256, (3, 3))
+        self.conv3 = nn.Conv2d(128, self.linear_input, (3, 3))
+        self.convnorm3 = nn.BatchNorm2d(self.linear_input)
 
         self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.linear = nn.Linear(256, OUTPUTS_a)
+        self.linear = nn.Linear(self.linear_input, OUTPUTS_a)
         self.act = torch.relu
 
     def forward(self, x):
-        x = self.pad1(self.convnorm1(self.act(self.conv1(x))))
-        x = self.act(self.dropout1(self.conv2(self.act(x))))
-        x = self.act(self.conv3(x))
-        return self.linear(self.global_avg_pool(x).view(-1, 256))
+        x = self.conv1(x)
+        x = self.convnorm1(x) # Based on Medium article, batch norm before ReLU may sligthly improve performance.
+        x = self.act(x)
+
+        x = self.conv2(x)
+        x = self.convnorm2(x)
+        x = self.act(x)
+        x = self.dropout1(x)
+
+        x = self.conv3(x)
+        x = self.convnorm3(x)
+        x = self.act(x)
+
+        x = self.global_avg_pool(x).view(-1, self.linear_input)
+        return self.linear(x)
 
 
 
