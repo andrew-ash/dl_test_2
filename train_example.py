@@ -36,7 +36,7 @@ sep = os.path.sep
 
 os.chdir(OR_PATH) # Come back to the directory where the code resides , all files will be left on this directory
 
-n_epoch = 6
+n_epoch = 10
 BATCH_SIZE = 30
 LR = 0.001
 
@@ -53,7 +53,7 @@ SAVE_MODEL = True
 
 # CUSTOMIZATION VARIABLES FROM EXPERIMENTATION THROUGHOUT THE PROJECT
 SHUFFLE_SEED = 1998 # Select a set seed for repeatable training as needed
-CUSTOM_LOSS_WEIGHT = 'log' # Custom loss weights could be 1/examples <- recip, 1/ln(examples) <- log, 1/log10(examples) <- log10, etc. or None
+CUSTOM_LOSS_WEIGHT = 'log10' # Custom loss weights could be 1/examples <- recip, 1/ln(examples) <- log, 1/log10(examples) <- log10, etc. or None
 
 #---- Define the model ---- #
 
@@ -543,11 +543,11 @@ def print_class_counts(df, label_col='target', name=''):
     counts = Counter(all_labels)
     count_array = []
 
-    print(f"\n############ PER-CLASS COUNT ({name}) ############")
+    #print(f"\n############ PER-CLASS COUNT ({name}) ############")
     for label, count in sorted(counts.items(), key=lambda x: int(x[0].replace("class", ""))):
-        print(f"{label}: {count}")
+        #print(f"{label}: {count}")
         count_array.append(count)
-    print("############ END ############")
+    #print("############ END ############")
     return np.array(count_array)
 
 if __name__ == '__main__':
@@ -575,7 +575,7 @@ if __name__ == '__main__':
 
     xdf_dset_test= xdf_data[xdf_data["split"] == 'test'].copy()
 
-    print_class_counts(xdf_dset_test, name="TEST")
+    #print_class_counts(xdf_dset_test, name="TEST")
 
     ## read_data creates the dataloaders, take target_type = 2
 
@@ -588,6 +588,7 @@ if __name__ == '__main__':
 
     if CUSTOM_LOSS_WEIGHT:
         # Extract ground truth from train set
+        print(CUSTOM_LOSS_WEIGHT)
         print(pos_class_count)
         EPS = 1+1e-7
 
