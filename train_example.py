@@ -14,6 +14,8 @@ from torchvision import transforms
 from torchvision import models
 from tqdm import tqdm
 import os
+import sys
+from datetime import datetime
 
 
 '''
@@ -37,7 +39,7 @@ sep = os.path.sep
 os.chdir(OR_PATH) # Come back to the directory where the code resides , all files will be left on this directory
 
 n_epoch = 10
-BATCH_SIZE = 30
+BATCH_SIZE = 60
 LR = 0.001
 
 ## Image processing
@@ -53,7 +55,23 @@ SAVE_MODEL = True
 
 # CUSTOMIZATION VARIABLES FROM EXPERIMENTATION THROUGHOUT THE PROJECT
 SHUFFLE_SEED = 1998 # Select a set seed for repeatable training as needed
-CUSTOM_LOSS_WEIGHT = 'log10' # Custom loss weights could be 1/examples <- recip, 1/ln(examples) <- log, 1/log10(examples) <- log10, etc. or None
+CUSTOM_LOSS_WEIGHT = 'log' # Custom loss weights could be 1/examples <- recip, 1/ln(examples) <- log, 1/log10(examples) <- log10, etc. or None
+ARCHITECTURE = '3-layer'
+
+# For logging to a file and the terminal in case I briefly lose terminal connection
+class DualLogger:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, message):
+        for stream in self.streams:
+            stream.write(message)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
 
 #---- Define the model ---- #
 
@@ -551,6 +569,13 @@ def print_class_counts(df, label_col='target', name=''):
     return np.array(count_array)
 
 if __name__ == '__main__':
+    # Make all logs during this script also print to an output file for future reference
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = open(f'{timestamp}_{ARCHITECTURE}_{CUSTOM_LOSS_WEIGHT}.log', 'a')
+    sys.stdout = DualLogger(sys.stdout, log_file)
+    sys.stderr = sys.stdout
+
+    print(f'Using CUSTOM LOSS WEIGHT: {CUSTOM_LOSS_WEIGHT} and Architecture: {ARCHITECTURE}')
 
     for file in os.listdir(PATH+os.path.sep + "excel"):
         if file[-5:] == '.xlsx':
