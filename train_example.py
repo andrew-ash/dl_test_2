@@ -38,7 +38,7 @@ sep = os.path.sep
 
 os.chdir(OR_PATH) # Come back to the directory where the code resides , all files will be left on this directory
 
-n_epoch = 10
+n_epoch = 20
 BATCH_SIZE = 60
 LR = 0.001
 
@@ -148,12 +148,16 @@ class Dataset(data.Dataset):
             transforms.RandomHorizontalFlip(),
             transforms.RandomRotation(10),
             transforms.ColorJitter(),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],  # ImageNet normalization
+                         std=[0.229, 0.224, 0.225])
         ])
 
         self.test_transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],  # ImageNet normalization
+                                 std=[0.229, 0.224, 0.225])
         ])
 
 
@@ -281,7 +285,9 @@ def model_definition(pretrained=False, loss_weights = None):
     else:
         criterion = nn.BCEWithLogitsLoss()
 
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=0)
+    # The provided scheduler could get down to basically no LR because a minimum was not provided.
+    #scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=0)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.33, patience=1, min_lr=1e-6)
 
     save_model(model)
 

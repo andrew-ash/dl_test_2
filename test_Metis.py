@@ -85,6 +85,13 @@ class Dataset(data.Dataset):
         self.list_IDs = list_IDs
         self.target_type = target_type
 
+        self.test_transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],  # ImageNet normalization
+                                 std=[0.229, 0.224, 0.225])
+        ])
+
 
     def __len__(self):
         #Denotes the total number of samples'
@@ -120,7 +127,7 @@ class Dataset(data.Dataset):
 
         img= cv2.resize(img,(IMAGE_SIZE, IMAGE_SIZE))
 
-        X = torch.FloatTensor(img)
+        X = self.test_transform(img)
 
         X = torch.reshape(X, (3, IMAGE_SIZE, IMAGE_SIZE))
 
