@@ -54,41 +54,22 @@ SAVE_MODEL = True
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
+        self.model = models.resnet18(weights='ResNet18_Weights.DEFAULT')
 
-        self.linear_input = 256
+        # Freeze all layers before replacing the fully connected layer
+        for param in self.model.parameters():
+            param.requires_grad = False
 
-        # I have decided to put the padding in before processing the first layer to maintain size during initial processing rather than add zeroes after.
-        self.conv1 = nn.Conv2d(3, 16, (3, 3), padding=2)
-        self.convnorm1 = nn.BatchNorm2d(16)
+        for param in self.model.layer4.parameters():
+            param.requires_grad = True
 
-        self.conv2 = nn.Conv2d(16, 128, (3, 3))
-        self.convnorm2 = nn.BatchNorm2d(128)
-        self.dropout1 = nn.Dropout(0.33)
-
-        self.conv3 = nn.Conv2d(128, self.linear_input, (3, 3))
-        self.convnorm3 = nn.BatchNorm2d(self.linear_input)
-
-        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-
-        self.linear = nn.Linear(self.linear_input, OUTPUTS_a)
-        self.act = torch.relu
+        # Replace the final classification layer as the only trainable layer, based on the starting recommendation from
+        # the course PyTorch labs.
+        in_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(in_features, 17)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.convnorm1(x) # Based on Medium article, batch norm before ReLU may sligthly improve performance.
-        x = self.act(x)
-
-        x = self.conv2(x)
-        x = self.convnorm2(x)
-        x = self.act(x)
-        x = self.dropout1(x)
-
-        x = self.conv3(x)
-        x = self.convnorm3(x)
-        x = self.act(x)
-
-        x = self.global_avg_pool(x).view(-1, self.linear_input)
-        return self.linear(x)
+        return self.model(x)
 
 
 

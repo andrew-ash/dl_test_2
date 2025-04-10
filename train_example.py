@@ -56,7 +56,7 @@ SAVE_MODEL = True
 # CUSTOMIZATION VARIABLES FROM EXPERIMENTATION THROUGHOUT THE PROJECT
 SHUFFLE_SEED = 1998 # Select a set seed for repeatable training as needed
 CUSTOM_LOSS_WEIGHT = 'log' # Custom loss weights could be 1/examples <- recip, 1/ln(examples) <- log, 1/log10(examples) <- log10, etc. or None
-ARCHITECTURE = '3-layer'
+ARCHITECTURE = 'ResNet18-Trainable4'
 
 # For logging to a file and the terminal in case I briefly lose terminal connection
 class DualLogger:
@@ -74,6 +74,25 @@ class DualLogger:
 
 
 #---- Define the model ---- #
+class Transfer_CNN(nn.Module):
+    def __init__(self):
+        super(Transfer_CNN, self).__init__()
+        self.model = models.resnet18(weights='ResNet18_Weights.DEFAULT')
+
+        # Freeze all layers before replacing the fully connected layer
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        for param in self.model.layer4.parameters():
+            param.requires_grad = True
+
+        # Replace the final classification layer as the only trainable layer, based on the starting recommendation from
+        # the course PyTorch labs.
+        in_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(in_features, 17)
+
+    def forward(self, x):
+        return self.model(x)
 
 class CNN(nn.Module):
     def __init__(self):
@@ -249,7 +268,8 @@ def model_definition(pretrained=False, loss_weights = None):
         model = models.resnet18(weights='ResNet18_Weights.DEFAULT')
         model.fc = nn.Linear(model.fc.in_features, OUTPUTS_a)
     else:
-        model = CNN()
+        model = Transfer_CNN() #CNN() testing
+        print(model)
 
     model = model.to(device)
 
