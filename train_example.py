@@ -38,8 +38,8 @@ sep = os.path.sep
 
 os.chdir(OR_PATH) # Come back to the directory where the code resides , all files will be left on this directory
 
-n_epoch = 20
-BATCH_SIZE = 60
+n_epoch = 30
+BATCH_SIZE = 120
 LR = 0.001
 
 ## Image processing
